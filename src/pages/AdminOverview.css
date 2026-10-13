@@ -38,6 +38,9 @@
 }
 .platform-metric > .muted { font-size: 0.8rem; }
 .platform-counts { align-items: stretch; }
+.platform-trends > div:first-child h2 { margin: 5px 0; font-size: 1.05rem; }
+.platform-trends > div:first-child p { margin: 0; font-size: 0.8rem; }
+.platform-trends .daily-analytics { margin-top: 16px; }
 .platform-count-list { display: grid; gap: 0; margin: 14px 0 0; }
 .platform-count-list > div {
   display: flex;

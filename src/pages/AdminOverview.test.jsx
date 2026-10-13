@@ -23,6 +23,10 @@ const report = {
     attendance: 8,
     openRefundRequests: 2,
   },
+  daily: [
+    { day: '2026-07-01', grossRevenueCents: 12000, refundedAmountCents: 0, ticketsSold: 6, attendance: 3 },
+    { day: '2026-07-02', grossRevenueCents: 12000, refundedAmountCents: 2500, ticketsSold: 6, attendance: 5 },
+  ],
 };
 
 function renderOverview({ role = 'super_admin', path = '/admin/overview' } = {}) {
@@ -56,9 +60,12 @@ describe('AdminOverview', () => {
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('8')).toBeInTheDocument();
     expect(screen.getByText('14')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(within(screen.getByRole('heading', { name: 'Events by status' }).closest('section')).getByText('3')).toBeInTheDocument();
     expect(screen.getByText(/2 refund requests awaiting review/i)).toBeInTheDocument();
     expect(await screen.findByText('All services operational')).toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'Daily ticket activity' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Sales by category' })).not.toBeInTheDocument();
   });
 
   it('uses UTC boundaries and applies an inclusive date selection as an exclusive API end', async () => {
@@ -66,7 +73,10 @@ describe('AdminOverview', () => {
     server.use(
       http.get('/api/v1/admin/analytics/summary', ({ request }) => {
         query = new URL(request.url).searchParams;
-        return HttpResponse.json({ success: true, data: report });
+        return HttpResponse.json({ success: true, data: {
+          ...report,
+          daily: [{ day: '2026-07-01', grossRevenueCents: 24000, refundedAmountCents: 0, ticketsSold: 12, attendance: 8 }],
+        } });
       }),
       http.get('/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok', db: true, redis: true } })),
     );
@@ -99,7 +109,7 @@ describe('AdminOverview', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Summary unavailable.');
     expect(screen.queryByText('0')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry platform metrics' }));
-    expect(await within(screen.getByText('Tickets sold').closest('section')).findByText('0')).toBeInTheDocument();
+    expect(await within(screen.getByText('Tickets sold', { selector: '.eyebrow' }).closest('section')).findByText('0')).toBeInTheDocument();
     expect(calls).toBe(2);
   });
 
@@ -108,6 +118,7 @@ describe('AdminOverview', () => {
       http.get('/api/v1/admin/analytics/summary', () => HttpResponse.json({ success: true, data: {
         usersByRole: {}, eventsByStatus: {},
         metrics: { ticketsSold: 0, grossRevenueCents: 0, refundedAmountCents: 0, netRevenueCents: 0, attendance: 0, openRefundRequests: 0 },
+        daily: [{ day: '2026-01-01', grossRevenueCents: 0, refundedAmountCents: 0, ticketsSold: 0, attendance: 0 }],
       } })),
       http.get('/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok', db: true, redis: true } })),
     );

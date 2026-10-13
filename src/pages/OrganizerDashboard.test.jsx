@@ -58,6 +58,8 @@ describe('OrganizerDashboard', () => {
     );
     renderPage();
     expect(await screen.findByText('Existing')).toBeInTheDocument();
+    expect(await screen.findByRole('figure', { name: /Revenue performance/ })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Gross sales, refunds, and net revenue by event' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Net revenue' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '$100.00' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '22 / 40' })).toBeInTheDocument();

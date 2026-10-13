@@ -6,6 +6,7 @@ import { eventPerformance } from '../lib/analyticsApi';
 import { messageFor } from '../lib/errors';
 import { EVENT_STATUSES, fromDateTimeLocal, optionalText } from '../lib/eventForms';
 import Pagination from '../components/Pagination.jsx';
+import EventPerformanceChart from '../components/EventPerformanceChart.jsx';
 import './OrganizerDashboardPerformance.css';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -204,6 +205,8 @@ export default function OrganizerDashboard() {
       {isLoading ? <p className="muted">Loading events…</p> : isError ? null : !events?.length ? (
         <p className="muted" style={{ marginTop: 16 }}>{search || filterStatus ? 'No events match these filters.' : 'No events yet. Create an event to get started.'}</p>
       ) : (
+        <>
+        <EventPerformanceChart events={events} />
         <div className="table-card organizer-performance-table">
           <table>
             <caption className="sr-only">Event performance and sales for the selected reporting window</caption>
@@ -241,6 +244,7 @@ export default function OrganizerDashboard() {
             </tbody>
           </table>
         </div>
+        </>
       )}
       {!isLoading && !isError && result && (
         <Pagination

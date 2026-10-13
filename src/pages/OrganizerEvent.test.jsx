@@ -44,7 +44,7 @@ describe('OrganizerEvent', () => {
     );
     renderAt('e1');
     expect(await screen.findByRole('heading', { name: 'My Event' })).toBeInTheDocument();
-    expect(await screen.findByRole('img', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
+    expect(await screen.findByRole('figure', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '3 sold' })).toBeInTheDocument();
     expect(screen.getByText(/\$45\.00/, { selector: 'p' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /publish/i }));
@@ -157,7 +157,7 @@ describe('OrganizerEvent', () => {
     await userEvent.type(screen.getByLabelText('To'), '2026-07-03');
     await userEvent.click(screen.getByRole('button', { name: 'Apply dates' }));
 
-    expect(await screen.findByRole('img', { name: 'Daily ticket activity' })).toBeInTheDocument();
+    expect(await screen.findByRole('figure', { name: 'Daily ticket activity' })).toBeInTheDocument();
     expect(requestParams.get('from')).toBe('2026-07-01T00:00:00.000Z');
     expect(requestParams.get('to')).toBe('2026-07-04T00:00:00.000Z');
   });
@@ -182,7 +182,7 @@ describe('OrganizerEvent', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Analytics unavailable.');
     expect(screen.getByText(/3 sold/i)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Retry event analytics' }));
-    expect(await screen.findByRole('img', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
+    expect(await screen.findByRole('figure', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
     expect(analyticsCalls).toBe(2);
   });
 });

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { platformAnalytics } from '../lib/analyticsApi';
 import { getHealth } from '../lib/systemApi';
 import { messageFor } from '../lib/errors';
+import DailyAnalytics from '../components/DailyAnalytics.jsx';
 import './AdminOverview.css';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -172,6 +173,16 @@ export default function AdminOverview() {
             <CountList title="Users by role" entries={data.usersByRole} emptyText="No user accounts have been created." />
             <CountList title="Events by status" entries={data.eventsByStatus} emptyText="No events have been created." />
           </div>
+          <section className="section platform-trends">
+            <div>
+              <span className="eyebrow">Platform activity</span>
+              <h2>Daily trends</h2>
+              <p className="muted">UTC daily totals for the selected reporting window.</p>
+            </div>
+            {data.daily.length === 0
+              ? <p className="muted">No daily data was returned for this reporting window.</p>
+              : <DailyAnalytics daily={data.daily} showCategories={false} />}
+          </section>
           <section className="section platform-refunds">
             <div>
               <span className="eyebrow">Refund operations</span>

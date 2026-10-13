@@ -1,0 +1,7 @@
+.event-performance-chart { min-width: 0; margin-top: 18px; }
+.event-performance-chart figcaption { display: grid; gap: 5px; margin-bottom: 12px; }
+.event-performance-chart figcaption strong { font-size: 1rem; }
+.event-performance-chart figcaption .muted { font-size: 0.8rem; }
+.event-performance-chart-plot { width: 100%; min-width: 0; }
+.event-performance-chart-plot .recharts-wrapper { outline-offset: 3px; }
+.event-performance-chart-plot :focus-visible { outline: 2px solid var(--accent); }

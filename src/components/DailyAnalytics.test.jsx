@@ -9,8 +9,8 @@ const daily = [
 ];
 
 describe('DailyAnalytics', () => {
-  it('renders independently labelled chart visualizations for reporting data', () => {
-    const { container } = render(<DailyAnalytics
+  it('renders named chart regions and category reporting data', async () => {
+    render(<DailyAnalytics
       daily={daily}
       ticketCategories={[
         { id: 'c1', name: 'General', sold: 3 },
@@ -18,11 +18,13 @@ describe('DailyAnalytics', () => {
       ]}
     />);
 
-    expect(screen.getByRole('img', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Daily ticket activity' })).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'General share of tickets sold' })).toHaveAttribute('aria-valuenow', '75');
-    expect(screen.getByRole('progressbar', { name: 'VIP share of tickets sold' })).toHaveAttribute('aria-valuenow', '25');
-    expect(container.querySelectorAll('.daily-chart-bar')).toHaveLength(8);
+    expect(screen.getByRole('figure', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'Daily ticket activity' })).toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'Ticket sales by category' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
+    await userEvent.click(screen.getByText('View category totals'));
+    expect(screen.getByText('General: 3 sold')).toBeInTheDocument();
+    expect(screen.getByText('VIP: 1 sold')).toBeInTheDocument();
   });
 
   it('provides an accessible table for exact daily values', async () => {
