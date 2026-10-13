@@ -1,0 +1,62 @@
+.platform-overview { gap: 18px; }
+.platform-period {
+  display: flex;
+  align-items: end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.platform-period > div { flex: 1 1 280px; }
+.platform-period p { margin: 6px 0 0; font-size: 0.82rem; }
+.platform-period label { min-width: 150px; }
+.platform-health,
+.platform-refunds {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.platform-health h2,
+.platform-refunds h2,
+.platform-panel h2 { margin: 5px 0 0; font-size: 1.05rem; }
+.platform-health-services {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  list-style: none;
+}
+.platform-health-services strong { color: var(--text); }
+.platform-metric { display: grid; gap: 9px; min-width: 0; }
+.platform-metric > strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: clamp(1.55rem, 3vw, 2.1rem);
+  line-height: 1.1;
+}
+.platform-metric > .muted { font-size: 0.8rem; }
+.platform-counts { align-items: stretch; }
+.platform-count-list { display: grid; gap: 0; margin: 14px 0 0; }
+.platform-count-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  text-transform: capitalize;
+}
+.platform-count-list > div:last-child { border-bottom: 0; }
+.platform-count-list dt { color: var(--muted); }
+.platform-count-list dd { margin: 0; font-weight: 750; }
+.platform-refunds p { margin: 6px 0 0; }
+
+@media (max-width: 620px) {
+  .platform-period { align-items: stretch; }
+  .platform-period > div,
+  .platform-period label,
+  .platform-period button { width: 100%; }
+  .platform-period button { justify-content: center; }
+  .platform-health-services { width: 100%; gap: 8px 16px; }
+}

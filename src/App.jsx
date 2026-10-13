@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, Link, useNavigate, NavLink } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth.jsx';
 import Browse from './pages/Browse.jsx';
 import EventDetail from './pages/EventDetail.jsx';
@@ -11,9 +11,11 @@ import MyTickets from './pages/MyTickets.jsx';
 import OrganizerDashboard from './pages/OrganizerDashboard.jsx';
 import OrganizerEvent from './pages/OrganizerEvent.jsx';
 import Scanner from './pages/Scanner.jsx';
+import AdminOverview from './pages/AdminOverview.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
 import SystemHealth from './components/SystemHealth.jsx';
 import { RequireAuth, RequireRole } from './components/RouteGuards.jsx';
+import DashboardLayout from './components/DashboardLayout.jsx';
 import logoTicUrl from './assets/logoTic.jfif?url';
 
 function Nav() {
@@ -28,11 +30,7 @@ function Nav() {
       <div className={`nav ${open ? 'open' : ''}`}>
         {user ? (
           <>
-            {(user.role === 'organizer' || user.role === 'super_admin') && <NavLink to="/organizer" className={link} onClick={close}>Organizer</NavLink>}
-            {(user.role === 'event_staff' || user.role === 'super_admin') && <NavLink to="/scan" className={link} onClick={close}>Scan</NavLink>}
-            {user.role === 'super_admin' && <NavLink to="/admin/users" className={link} onClick={close}>Users</NavLink>}
-            <NavLink to="/tickets" className={link} onClick={close}>My tickets</NavLink>
-            <NavLink to="/account" className={link} onClick={close}>Account</NavLink>
+            <NavLink to="/dashboard" className={link} onClick={close}>Dashboard</NavLink>
             <span className="nav-email">{user.email}</span>
             <button className="ghost" onClick={async () => { close(); await logout(); navigate('/'); }}>Log out</button>
           </>
@@ -45,8 +43,11 @@ function Nav() {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
+  const dashboardRoute = ['/dashboard', '/account', '/tickets', '/scan', '/admin/overview', '/admin/users'].includes(pathname)
+    || pathname.startsWith('/organizer');
   return (
-    <div className="app-shell">
+    <div className={`app-shell${dashboardRoute ? ' has-dashboard' : ''}`}>
       <header className="app-header">
         <div className="app-header-inner">
         <Link to="/" className="brand">
@@ -63,12 +64,16 @@ export default function App() {
           <Route path="/orders/:id" element={<Confirmation />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/account" element={<RequireAuth><Account /></RequireAuth>} />
-          <Route path="/tickets" element={<RequireAuth><MyTickets /></RequireAuth>} />
-          <Route path="/organizer" element={<RequireRole roles={['organizer', 'super_admin']}><OrganizerDashboard /></RequireRole>} />
-          <Route path="/organizer/events/:id" element={<RequireRole roles={['organizer', 'super_admin']}><OrganizerEvent /></RequireRole>} />
-          <Route path="/scan" element={<RequireRole roles={['event_staff', 'super_admin']}><Scanner /></RequireRole>} />
-          <Route path="/admin/users" element={<RequireRole roles={['super_admin']}><AdminUsers /></RequireRole>} />
+          <Route element={<RequireAuth><DashboardLayout /></RequireAuth>}>
+            <Route path="/dashboard" element={null} />
+            <Route path="/account" element={<Account />} />
+            <Route path="/tickets" element={<MyTickets />} />
+            <Route path="/organizer" element={<RequireRole roles={['organizer', 'super_admin']}><OrganizerDashboard /></RequireRole>} />
+            <Route path="/organizer/events/:id" element={<RequireRole roles={['organizer', 'super_admin']}><OrganizerEvent /></RequireRole>} />
+            <Route path="/scan" element={<RequireRole roles={['event_staff', 'super_admin']}><Scanner /></RequireRole>} />
+            <Route path="/admin/overview" element={<RequireRole roles={['super_admin']}><AdminOverview /></RequireRole>} />
+            <Route path="/admin/users" element={<RequireRole roles={['super_admin']}><AdminUsers /></RequireRole>} />
+          </Route>
         </Routes>
       </main>
       <footer className="app-footer">
