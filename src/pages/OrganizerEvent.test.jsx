@@ -21,6 +21,14 @@ function renderAt(id) {
 const draft = { id: 'e1', title: 'My Event', status: 'draft', location: null, starts_at: null, description: null, created_at: '', categories: [] };
 const sales = { eventId: 'e1', title: 'My Event', categories: [], totals: { sold: 3, revenueCents: 4500 } };
 const emptyPage = { rows: [], page: 1, pageSize: 20, total: 0, totalPages: 0 };
+const analytics = {
+  event: { id: 'e1', title: 'My Event' },
+  period: { timeZone: 'UTC', endExclusive: true, interval: 'day' },
+  metrics: { ticketsSold: 3, grossRevenueCents: 4500, refundedAmountCents: 0, netRevenueCents: 4500, attendance: 2 },
+  daily: [{ day: '2026-07-01', grossRevenueCents: 4500, refundedAmountCents: 0, ticketsSold: 3, attendance: 2 }],
+  ticketCategories: [{ id: 'c1', name: 'General', sold: 3 }],
+};
+const analyticsHandler = () => http.get('/api/v1/events/e1/analytics', () => HttpResponse.json({ success: true, data: analytics }));
 
 describe('OrganizerEvent', () => {
   it('shows the event, its sales totals, and publishes a draft', async () => {
@@ -28,6 +36,7 @@ describe('OrganizerEvent', () => {
     server.use(
       http.get('/api/v1/admin/events/e1', () => HttpResponse.json({ success: true, data: { ...draft, status } })),
       http.get('/api/v1/events/e1/sales', () => HttpResponse.json({ success: true, data: sales })),
+      analyticsHandler(),
       http.get('/api/v1/events/e1/orders', () => HttpResponse.json({ success: true, data: emptyPage })),
       http.get('/api/v1/events/e1/refund-requests', () => HttpResponse.json({ success: true, data: emptyPage })),
       http.get('/api/v1/events/e1/staff', () => HttpResponse.json({ success: true, data: [] })),
@@ -35,8 +44,9 @@ describe('OrganizerEvent', () => {
     );
     renderAt('e1');
     expect(await screen.findByRole('heading', { name: 'My Event' })).toBeInTheDocument();
-    expect(screen.getByText(/3 sold/i)).toBeInTheDocument();
-    expect(screen.getByText(/\$45\.00/)).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '3 sold' })).toBeInTheDocument();
+    expect(screen.getByText(/\$45\.00/, { selector: 'p' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /publish/i }));
     expect(await screen.findByText(/^published$/i, { selector: '.badge' })).toBeInTheDocument();
   });
@@ -46,6 +56,7 @@ describe('OrganizerEvent', () => {
     server.use(
       http.get('/api/v1/admin/events/e1', () => HttpResponse.json({ success: true, data: { ...draft, categories } })),
       http.get('/api/v1/events/e1/sales', () => HttpResponse.json({ success: true, data: sales })),
+      analyticsHandler(),
       http.get('/api/v1/events/e1/orders', () => HttpResponse.json({ success: true, data: emptyPage })),
       http.get('/api/v1/events/e1/refund-requests', () => HttpResponse.json({ success: true, data: emptyPage })),
       http.get('/api/v1/events/e1/staff', () => HttpResponse.json({ success: true, data: [] })),
@@ -71,6 +82,7 @@ describe('OrganizerEvent', () => {
     server.use(
       http.get('/api/v1/admin/events/e1', () => HttpResponse.json({ success: true, data: { ...draft, status: 'published' } })),
       http.get('/api/v1/events/e1/sales', () => HttpResponse.json({ success: true, data: sales })),
+      analyticsHandler(),
       http.get('/api/v1/events/e1/orders', () => HttpResponse.json({ success: true, data: { ...emptyPage, rows: orders, total: orders.length, totalPages: 1 } })),
       http.get('/api/v1/events/e1/refund-requests', () => HttpResponse.json({ success: true, data: emptyPage })),
       http.get('/api/v1/events/e1/staff', () => HttpResponse.json({ success: true, data: [] })),
@@ -98,6 +110,7 @@ describe('OrganizerEvent', () => {
     server.use(
       http.get('/api/v1/admin/events/e1', () => HttpResponse.json({ success: true, data: draft })),
       http.get('/api/v1/events/e1/sales', () => HttpResponse.json({ success: true, data: sales })),
+      analyticsHandler(),
       http.get('/api/v1/events/e1/staff', () => (++staffCalls === 1
         ? unavailable()
         : HttpResponse.json({ success: true, data: [] }))),
@@ -121,5 +134,55 @@ describe('OrganizerEvent', () => {
     expect(staffCalls).toBe(2);
     expect(refundCalls).toBe(2);
     expect(orderCalls).toBe(2);
+  });
+
+  it('applies an inclusive calendar date range as the exclusive UTC API end', async () => {
+    let requestParams;
+    server.use(
+      http.get('/api/v1/admin/events/e1', () => HttpResponse.json({ success: true, data: draft })),
+      http.get('/api/v1/events/e1/sales', () => HttpResponse.json({ success: true, data: sales })),
+      http.get('/api/v1/events/e1/analytics', ({ request }) => {
+        requestParams = new URL(request.url).searchParams;
+        return HttpResponse.json({ success: true, data: analytics });
+      }),
+      http.get('/api/v1/events/e1/orders', () => HttpResponse.json({ success: true, data: emptyPage })),
+      http.get('/api/v1/events/e1/refund-requests', () => HttpResponse.json({ success: true, data: emptyPage })),
+      http.get('/api/v1/events/e1/staff', () => HttpResponse.json({ success: true, data: [] })),
+    );
+    renderAt('e1');
+    await screen.findByRole('heading', { name: 'My Event' });
+    await userEvent.clear(screen.getByLabelText('From'));
+    await userEvent.type(screen.getByLabelText('From'), '2026-07-01');
+    await userEvent.clear(screen.getByLabelText('To'));
+    await userEvent.type(screen.getByLabelText('To'), '2026-07-03');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply dates' }));
+
+    expect(await screen.findByRole('img', { name: 'Daily ticket activity' })).toBeInTheDocument();
+    expect(requestParams.get('from')).toBe('2026-07-01T00:00:00.000Z');
+    expect(requestParams.get('to')).toBe('2026-07-04T00:00:00.000Z');
+  });
+
+  it('keeps analytics failures separate and offers an explicit retry', async () => {
+    let analyticsCalls = 0;
+    server.use(
+      http.get('/api/v1/admin/events/e1', () => HttpResponse.json({ success: true, data: draft })),
+      http.get('/api/v1/events/e1/sales', () => HttpResponse.json({ success: true, data: sales })),
+      http.get('/api/v1/events/e1/analytics', () => {
+        analyticsCalls += 1;
+        return analyticsCalls === 1
+          ? HttpResponse.json({ success: false, error: { code: 'SERVER_ERROR', message: 'Analytics unavailable.' } }, { status: 503 })
+          : HttpResponse.json({ success: true, data: analytics });
+      }),
+      http.get('/api/v1/events/e1/orders', () => HttpResponse.json({ success: true, data: emptyPage })),
+      http.get('/api/v1/events/e1/refund-requests', () => HttpResponse.json({ success: true, data: emptyPage })),
+      http.get('/api/v1/events/e1/staff', () => HttpResponse.json({ success: true, data: [] })),
+    );
+    renderAt('e1');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Analytics unavailable.');
+    expect(screen.getByText(/3 sold/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry event analytics' }));
+    expect(await screen.findByRole('img', { name: 'Daily revenue and refunds' })).toBeInTheDocument();
+    expect(analyticsCalls).toBe(2);
   });
 });

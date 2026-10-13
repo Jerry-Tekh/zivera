@@ -18,10 +18,31 @@ import {
 import { messageFor } from '../lib/errors';
 import { heroFor } from '../lib/images';
 import { EVENT_STATUSES, fromDateTimeLocal, optionalText, toDateTimeLocal } from '../lib/eventForms';
+import { eventAnalytics } from '../lib/analyticsApi';
 import Pagination from '../components/Pagination.jsx';
+import DailyAnalytics from '../components/DailyAnalytics.jsx';
+import './OrganizerEventAnalytics.css';
 
 const money = (c) => `$${(c / 100).toFixed(2)}`;
 const PAGE_SIZE = 20;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcDateValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function defaultAnalyticsPeriod() {
+  const today = new Date();
+  const to = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  return {
+    from: utcDateValue(new Date(to.getTime() - 29 * DAY_MS)),
+    to: utcDateValue(to),
+  };
+}
+
+function exclusiveEnd(date) {
+  return new Date(new Date(`${date}T00:00:00.000Z`).getTime() + DAY_MS).toISOString();
+}
 
 export default function OrganizerEvent() {
   const { id } = useParams();
@@ -44,9 +65,22 @@ export default function OrganizerEvent() {
   const [refundsPage, setRefundsPage] = useState(1);
   const [ordersStatus, setOrdersStatus] = useState('');
   const [refundsStatus, setRefundsStatus] = useState('');
+  const [analyticsPeriod, setAnalyticsPeriod] = useState(defaultAnalyticsPeriod);
+  const [analyticsDraft, setAnalyticsDraft] = useState(defaultAnalyticsPeriod);
+  const [analyticsPeriodError, setAnalyticsPeriodError] = useState('');
 
   const event = useQuery({ queryKey: ['managed-event', id], queryFn: () => apiGet(`/admin/events/${id}`) });
   const sales = useQuery({ queryKey: ['sales', id], queryFn: () => eventSales(id) });
+  const analytics = useQuery({
+    queryKey: ['event-analytics', id, analyticsPeriod.from, analyticsPeriod.to],
+    queryFn: () => eventAnalytics(id, {
+      from: new Date(`${analyticsPeriod.from}T00:00:00.000Z`).toISOString(),
+      to: exclusiveEnd(analyticsPeriod.to),
+    }),
+    enabled: Boolean(analyticsPeriod.from && analyticsPeriod.to
+      && analyticsPeriod.to >= analyticsPeriod.from
+      && (new Date(`${analyticsPeriod.to}T00:00:00.000Z`) - new Date(`${analyticsPeriod.from}T00:00:00.000Z`)) < 366 * DAY_MS),
+  });
   const orders = useQuery({
     queryKey: ['event-orders', id, ordersPage, ordersStatus],
     queryFn: () => eventOrders(id, { page: ordersPage, pageSize: PAGE_SIZE, status: ordersStatus }),
@@ -71,6 +105,7 @@ export default function OrganizerEvent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['event-orders', id] });
       qc.invalidateQueries({ queryKey: ['sales', id] });
+      qc.invalidateQueries({ queryKey: ['event-analytics', id] });
       qc.invalidateQueries({ queryKey: ['managed-event', id] });
     },
     onError: (e) => setErr(messageFor(e)),
@@ -142,6 +177,7 @@ export default function OrganizerEvent() {
       qc.invalidateQueries({ queryKey: ['event-refund-requests', id] });
       qc.invalidateQueries({ queryKey: ['event-orders', id] });
       qc.invalidateQueries({ queryKey: ['sales', id] });
+      qc.invalidateQueries({ queryKey: ['event-analytics', id] });
       qc.invalidateQueries({ queryKey: ['managed-event', id] });
     },
     onError: (e) => setErr(messageFor(e)),
@@ -161,6 +197,19 @@ export default function OrganizerEvent() {
   const totals = sales.data?.totals;
   const orderRows = orders.data?.rows ?? [];
   const refundRows = refundRequests.data?.rows ?? [];
+
+  function applyAnalyticsPeriod(e) {
+    e.preventDefault();
+    const fromDate = new Date(`${analyticsDraft.from}T00:00:00.000Z`);
+    const toDate = new Date(`${analyticsDraft.to}T00:00:00.000Z`);
+    const days = (toDate - fromDate) / DAY_MS + 1;
+    if (!analyticsDraft.from || !analyticsDraft.to || days < 1 || days > 366) {
+      setAnalyticsPeriodError('Choose a valid date range of no more than 366 days.');
+      return;
+    }
+    setAnalyticsPeriodError('');
+    setAnalyticsPeriod(analyticsDraft);
+  }
 
   return (
     <div className="page reveal">
@@ -197,6 +246,59 @@ export default function OrganizerEvent() {
         {ev.status === 'draft' && <button className="primary" onClick={() => { setErr(null); publish.mutate(); }} disabled={publish.isPending}>Publish</button>}
       </div>
       {err && <p className="alert danger">{err}</p>}
+
+      <section className="section event-analytics">
+        <div className="between event-analytics-heading">
+          <div>
+            <span className="eyebrow">Performance</span>
+            <h2>Event analytics</h2>
+            <p className="muted">UTC reporting window, including the selected end date.</p>
+          </div>
+          <form className="event-analytics-period" onSubmit={applyAnalyticsPeriod}>
+            <label>From
+              <input
+                type="date"
+                value={analyticsDraft.from}
+                max={analyticsDraft.to || undefined}
+                onChange={(e) => setAnalyticsDraft((current) => ({ ...current, from: e.target.value }))}
+              />
+            </label>
+            <label>To
+              <input
+                type="date"
+                value={analyticsDraft.to}
+                min={analyticsDraft.from || undefined}
+                onChange={(e) => setAnalyticsDraft((current) => ({ ...current, to: e.target.value }))}
+              />
+            </label>
+            <button type="submit">Apply dates</button>
+          </form>
+        </div>
+        {analyticsPeriodError && <p role="alert" className="alert danger">{analyticsPeriodError}</p>}
+        {analytics.isLoading ? (
+          <p className="muted" aria-live="polite">Loading event analytics…</p>
+        ) : analytics.isError ? (
+          <div>
+            <p role="alert" className="alert danger">{messageFor(analytics.error)}</p>
+            <button type="button" onClick={() => analytics.refetch()}>Retry event analytics</button>
+          </div>
+        ) : analytics.data ? (
+          <>
+            <div className="grid-3 event-analytics-metrics">
+              <div><span className="eyebrow">Net revenue</span><strong>{money(analytics.data.metrics.netRevenueCents)}</strong></div>
+              <div><span className="eyebrow">Tickets sold</span><strong>{analytics.data.metrics.ticketsSold}</strong></div>
+              <div><span className="eyebrow">Attendance</span><strong>{analytics.data.metrics.attendance}</strong></div>
+            </div>
+            {analytics.data.daily.length === 0
+              ? <p className="muted">No analytics were returned for this date range.</p>
+              : <DailyAnalytics daily={analytics.data.daily} ticketCategories={analytics.data.ticketCategories} />}
+            {analytics.data.daily.length > 0
+              && analytics.data.daily.every((day) => day.ticketsSold === 0 && day.grossRevenueCents === 0
+                && day.refundedAmountCents === 0 && day.attendance === 0)
+              && <p className="muted">No sales, refunds, or attendance were recorded in this reporting window.</p>}
+          </>
+        ) : <p className="muted">Event analytics are unavailable.</p>}
+      </section>
 
       <form onSubmit={(e) => { e.preventDefault(); setErr(null); saveDetails.mutate(); }}
         className="section form-grid">
