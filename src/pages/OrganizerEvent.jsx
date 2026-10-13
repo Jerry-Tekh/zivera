@@ -18,8 +18,10 @@ import {
 import { messageFor } from '../lib/errors';
 import { heroFor } from '../lib/images';
 import { EVENT_STATUSES, fromDateTimeLocal, optionalText, toDateTimeLocal } from '../lib/eventForms';
+import Pagination from '../components/Pagination.jsx';
 
 const money = (c) => `$${(c / 100).toFixed(2)}`;
+const PAGE_SIZE = 20;
 
 export default function OrganizerEvent() {
   const { id } = useParams();
@@ -38,11 +40,21 @@ export default function OrganizerEvent() {
   const [categoryEdits, setCategoryEdits] = useState({});
   const [staffEmail, setStaffEmail] = useState('');
   const [err, setErr] = useState(null);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [refundsPage, setRefundsPage] = useState(1);
+  const [ordersStatus, setOrdersStatus] = useState('');
+  const [refundsStatus, setRefundsStatus] = useState('');
 
-  const event = useQuery({ queryKey: ['event', id], queryFn: () => apiGet(`/events/${id}`) });
+  const event = useQuery({ queryKey: ['managed-event', id], queryFn: () => apiGet(`/admin/events/${id}`) });
   const sales = useQuery({ queryKey: ['sales', id], queryFn: () => eventSales(id) });
-  const orders = useQuery({ queryKey: ['event-orders', id], queryFn: () => eventOrders(id) });
-  const refundRequests = useQuery({ queryKey: ['event-refund-requests', id], queryFn: () => eventRefundRequests(id) });
+  const orders = useQuery({
+    queryKey: ['event-orders', id, ordersPage, ordersStatus],
+    queryFn: () => eventOrders(id, { page: ordersPage, pageSize: PAGE_SIZE, status: ordersStatus }),
+  });
+  const refundRequests = useQuery({
+    queryKey: ['event-refund-requests', id, refundsPage, refundsStatus],
+    queryFn: () => eventRefundRequests(id, { page: refundsPage, pageSize: PAGE_SIZE, status: refundsStatus }),
+  });
   const staff = useQuery({ queryKey: ['event-staff', id], queryFn: () => listEventStaff(id) });
 
   useEffect(() => {
@@ -59,14 +71,14 @@ export default function OrganizerEvent() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['event-orders', id] });
       qc.invalidateQueries({ queryKey: ['sales', id] });
-      qc.invalidateQueries({ queryKey: ['event', id] });
+      qc.invalidateQueries({ queryKey: ['managed-event', id] });
     },
     onError: (e) => setErr(messageFor(e)),
   });
 
   const publish = useMutation({
     mutationFn: () => updateEvent(id, { status: 'published' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['event', id] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['managed-event', id] }),
     onError: (e) => setErr(messageFor(e)),
   });
   const saveDetails = useMutation({
@@ -78,7 +90,7 @@ export default function OrganizerEvent() {
       status,
     }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['event', id] });
+      qc.invalidateQueries({ queryKey: ['managed-event', id] });
       qc.invalidateQueries({ queryKey: ['admin-events'] });
     },
     onError: (e) => setErr(messageFor(e)),
@@ -99,14 +111,14 @@ export default function OrganizerEvent() {
       setMaxPerCustomer('');
       setSalesOpenAt('');
       setSalesCloseAt('');
-      qc.invalidateQueries({ queryKey: ['event', id] });
+      qc.invalidateQueries({ queryKey: ['managed-event', id] });
     },
     onError: (e) => setErr(messageFor(e)),
   });
   const saveCategory = useMutation({
     mutationFn: ({ categoryId, data }) => updateCategory(id, categoryId, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['event', id] });
+      qc.invalidateQueries({ queryKey: ['managed-event', id] });
       qc.invalidateQueries({ queryKey: ['sales', id] });
     },
     onError: (e) => setErr(messageFor(e)),
@@ -130,14 +142,25 @@ export default function OrganizerEvent() {
       qc.invalidateQueries({ queryKey: ['event-refund-requests', id] });
       qc.invalidateQueries({ queryKey: ['event-orders', id] });
       qc.invalidateQueries({ queryKey: ['sales', id] });
-      qc.invalidateQueries({ queryKey: ['event', id] });
+      qc.invalidateQueries({ queryKey: ['managed-event', id] });
     },
     onError: (e) => setErr(messageFor(e)),
   });
 
-  if (event.isLoading || !event.data) return <p className="muted">Loading…</p>;
+  if (event.isLoading) return <p className="muted">Loading event…</p>;
+  if (event.isError) {
+    return (
+      <div className="page">
+        <p role="alert" className="alert danger">{messageFor(event.error)}</p>
+        <button type="button" onClick={() => event.refetch()}>Retry loading event</button>
+      </div>
+    );
+  }
+  if (!event.data) return <p role="alert" className="alert danger">Event data is unavailable.</p>;
   const ev = event.data;
   const totals = sales.data?.totals;
+  const orderRows = orders.data?.rows ?? [];
+  const refundRows = refundRequests.data?.rows ?? [];
 
   return (
     <div className="page reveal">
@@ -147,17 +170,29 @@ export default function OrganizerEvent() {
         <div className="hero-content">
           <span className="badge">{ev.status}</span>
           <h1 style={{ marginTop: 12 }}>{ev.title}</h1>
-          <p className="mono" style={{ color: '#e0e7ff', marginTop: 8 }}>{ev.location || 'Location TBA'}</p>
+          <p className="mono" style={{ color: 'rgba(255, 255, 255, 0.84)', marginTop: 8 }}>{ev.location || 'Location TBA'}</p>
         </div>
       </section>
 
       <div className="row">
-        {totals && (
+        {sales.isLoading ? (
           <div className="section">
             <span className="eyebrow">Sales</span>
-            <h2 style={{ marginTop: 8 }}>{totals.sold} sold</h2>
-            <p className="mono muted">{money(totals.revenueCents)} revenue</p>
+            <p className="muted">Loading sales…</p>
           </div>
+        ) : sales.isError ? (
+          <div className="section">
+            <p role="alert" className="alert danger">{messageFor(sales.error)}</p>
+            <button type="button" onClick={() => sales.refetch()}>Retry sales</button>
+          </div>
+        ) : (
+          totals && (
+            <div className="section">
+              <span className="eyebrow">Sales</span>
+              <h2 style={{ marginTop: 8 }}>{totals.sold} sold</h2>
+              <p className="mono muted">{money(totals.revenueCents)} revenue</p>
+            </div>
+          )
         )}
         {ev.status === 'draft' && <button className="primary" onClick={() => { setErr(null); publish.mutate(); }} disabled={publish.isPending}>Publish</button>}
       </div>
@@ -246,6 +281,14 @@ export default function OrganizerEvent() {
         <label style={{ flex: '1 1 240px' }}>Staff email<input type="email" value={staffEmail} onChange={(e) => setStaffEmail(e.target.value)} required /></label>
         <button className="primary" type="submit" disabled={!staffEmail || assignStaff.isPending}>{assignStaff.isPending ? 'Assigning…' : 'Assign staff'}</button>
       </form>
+      {staff.isLoading && <p className="muted">Loading staff…</p>}
+      {staff.isError && (
+        <div>
+          <p role="alert" className="alert danger">{messageFor(staff.error)}</p>
+          <button type="button" onClick={() => staff.refetch()}>Retry staff</button>
+        </div>
+      )}
+      {!staff.isError && staff.data?.length === 0 && <p className="muted">No staff assigned.</p>}
       <ul className="data-list" style={{ marginTop: 16 }}>
         {(staff.data ?? []).map((s) => (
           <li key={s.id} className="data-row">
@@ -259,9 +302,26 @@ export default function OrganizerEvent() {
       <section className="section">
       <span className="eyebrow">Refund queue</span>
       <h2 style={{ marginTop: 6 }}>Refund requests</h2>
-      {refundRequests.data && refundRequests.data.length === 0 && <p className="muted">No refund requests.</p>}
+      <label style={{ display: 'inline-flex', marginTop: 12 }}>Status
+        <select value={refundsStatus} onChange={(e) => { setRefundsPage(1); setRefundsStatus(e.target.value); }}>
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </label>
+      {refundRequests.isLoading && <p className="muted">Loading refund requests…</p>}
+      {refundRequests.isError && (
+        <div>
+          <p role="alert" className="alert danger">{messageFor(refundRequests.error)}</p>
+          <button type="button" onClick={() => refundRequests.refetch()}>Retry refund requests</button>
+        </div>
+      )}
+      {!refundRequests.isError && refundRequests.data && refundRows.length === 0 && (
+        <p className="muted">{refundRequests.data.total === 0 ? 'No refund requests.' : 'No requests on this page.'}</p>
+      )}
       <ul className="data-list" style={{ marginTop: 16 }}>
-        {(refundRequests.data ?? []).map((r) => (
+        {refundRows.map((r) => (
           <li key={r.id} className="data-row">
             <span>
               <span style={{ fontWeight: 600 }}>{r.email}</span>
@@ -277,15 +337,41 @@ export default function OrganizerEvent() {
           </li>
         ))}
       </ul>
+      {refundRequests.data && (
+        <Pagination
+          page={refundRequests.data.page}
+          pageSize={refundRequests.data.pageSize}
+          total={refundRequests.data.total}
+          totalPages={refundRequests.data.totalPages}
+          onPageChange={setRefundsPage}
+        />
+      )}
       </section>
 
       <section className="section">
       <span className="eyebrow">Orders</span>
       <h2 style={{ marginTop: 6 }}>Recent orders</h2>
+      <label style={{ display: 'inline-flex', marginTop: 12 }}>Status
+        <select value={ordersStatus} onChange={(e) => { setOrdersPage(1); setOrdersStatus(e.target.value); }}>
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="paid">Paid</option>
+          <option value="failed">Failed</option>
+          <option value="refunded">Refunded</option>
+        </select>
+      </label>
       {orders.isLoading && <p className="muted">Loading orders…</p>}
-      {orders.data && orders.data.length === 0 && <p className="muted">No orders yet.</p>}
+      {orders.isError && (
+        <div>
+          <p role="alert" className="alert danger">{messageFor(orders.error)}</p>
+          <button type="button" onClick={() => orders.refetch()}>Retry orders</button>
+        </div>
+      )}
+      {!orders.isError && orders.data && orderRows.length === 0 && (
+        <p className="muted">{orders.data.total === 0 ? 'No orders yet.' : 'No orders on this page.'}</p>
+      )}
       <ul className="data-list" style={{ marginTop: 16 }}>
-        {(orders.data ?? []).map((o) => (
+        {orderRows.map((o) => (
           <li key={o.id} className="data-row">
             <span>
               <span style={{ fontWeight: 600 }}>{o.email}</span>
@@ -305,6 +391,15 @@ export default function OrganizerEvent() {
           </li>
         ))}
       </ul>
+      {orders.data && (
+        <Pagination
+          page={orders.data.page}
+          pageSize={orders.data.pageSize}
+          total={orders.data.total}
+          totalPages={orders.data.totalPages}
+          onPageChange={setOrdersPage}
+        />
+      )}
       </section>
     </div>
   );

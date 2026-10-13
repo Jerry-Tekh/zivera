@@ -78,17 +78,24 @@ describe('authApi', () => {
 
   it('lists admin users and updates a role', async () => {
     let roleBody = null;
+    let query;
     server.use(
-      http.get('/api/v1/admin/users', () => HttpResponse.json({
+      http.get('/api/v1/admin/users', ({ request }) => {
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json({
         success: true,
-        data: [{ id: 'u1', name: 'A', email: 'a@b.co', role: 'registered_user' }],
-      })),
+        data: { rows: [{ id: 'u1', name: 'A', email: 'a@b.co', role: 'registered_user' }], page: 1, pageSize: 10, total: 1, totalPages: 1 },
+      });
+      }),
       http.patch('/api/v1/admin/users/u1/role', async ({ request }) => {
         roleBody = await request.json();
         return HttpResponse.json({ success: true, data: { id: 'u1', role: roleBody.role } });
       }),
     );
-    expect((await listUsers())[0].id).toBe('u1');
+    expect((await listUsers({ page: 1, pageSize: 10, search: 'A', role: 'registered_user' })).rows[0].id).toBe('u1');
+    expect(query.get('pageSize')).toBe('10');
+    expect(query.get('search')).toBe('A');
+    expect(query.get('role')).toBe('registered_user');
     expect((await updateUserRole('u1', 'organizer')).role).toBe('organizer');
     expect(roleBody).toEqual({ role: 'organizer' });
   });

@@ -43,7 +43,9 @@ describe('Scanner', () => {
       http.post('/api/v1/events/e1/scan', () => HttpResponse.json({ success: true, data: { result: 'accepted', ticketId: 't1' } })),
     );
     renderScanner();
-    await userEvent.type(screen.getByLabelText(/event id/i), 'e1');
+    expect(screen.queryByLabelText(/event id/i)).not.toBeInTheDocument();
+    await screen.findByRole('option', { name: /gate night/i });
+    await userEvent.selectOptions(screen.getByLabelText(/^event$/i), 'e1');
     await fillAndScan('TKN');
     expect(await screen.findByText(/admitted/i)).toBeInTheDocument();
 
@@ -69,5 +71,54 @@ describe('Scanner', () => {
     server.use(http.get('/api/v1/staff/events', () => HttpResponse.json({ success: true, data: [] })));
     renderScanner();
     expect(await screen.findByText(/no assigned events/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^scan$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /use camera/i })).toBeDisabled();
+  });
+
+  it('shows an assigned-event load error and retries successfully', async () => {
+    let calls = 0;
+    server.use(http.get('/api/v1/staff/events', () => {
+      calls += 1;
+      return calls === 1
+        ? HttpResponse.json({ success: false, error: { code: 'SERVER_ERROR', message: 'Service unavailable.' } }, { status: 503 })
+        : HttpResponse.json({ success: true, data: [{ id: 'e1', title: 'Gate Night', location: 'Hall' }] });
+    }));
+    renderScanner();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Service unavailable.');
+    expect(screen.queryByText(/no assigned events/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /retry assigned events/i }));
+    expect(await screen.findByRole('option', { name: /gate night/i })).toBeInTheDocument();
+    expect(calls).toBe(2);
+  });
+
+  it('uses the selected event, shows its context, and clears results when switching events', async () => {
+    server.use(
+      http.get('/api/v1/staff/events', () => HttpResponse.json({
+        success: true,
+        data: [
+          { id: 'e1', title: 'Gate Night', location: 'Hall One', starts_at: '2026-11-15T19:00:00Z' },
+          { id: 'e2', title: 'Matinee', location: 'Hall Two', starts_at: null },
+        ],
+      })),
+      http.post('/api/v1/events/e1/scan', () => HttpResponse.json({ success: true, data: { result: 'accepted' } })),
+      http.post('/api/v1/events/e2/scan', () => HttpResponse.json({ success: true, data: { result: 'accepted' } })),
+    );
+    renderScanner();
+
+    await screen.findByRole('option', { name: /gate night/i });
+    const eventSelect = await screen.findByLabelText(/^event$/i);
+    await userEvent.selectOptions(eventSelect, 'e1');
+    const selectedContext = screen.getByRole('region', { name: /selected event/i });
+    expect(selectedContext).toHaveTextContent('Gate Night');
+    expect(selectedContext).toHaveTextContent('Hall One');
+    expect(selectedContext).toHaveTextContent(/2026/);
+    await fillAndScan('TKN');
+    expect(await screen.findByText(/admitted/i)).toBeInTheDocument();
+
+    await userEvent.selectOptions(eventSelect, 'e2');
+    expect(screen.queryByText(/admitted/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /selected event/i })).toHaveTextContent('Matinee');
+    expect(screen.getByLabelText(/ticket code/i)).toHaveValue('');
   });
 });

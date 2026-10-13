@@ -13,7 +13,9 @@ export default function Account() {
   const [newPassword, setNewPassword] = useState('');
   const [profileMessage, setProfileMessage] = useState(null);
   const [passwordMessage, setPasswordMessage] = useState(null);
-  const { data: sessions, isLoading } = useQuery({ queryKey: ['sessions'], queryFn: listSessions });
+  const [sessionMessage, setSessionMessage] = useState(null);
+  const sessionsQuery = useQuery({ queryKey: ['sessions'], queryFn: listSessions });
+  const { data: sessions } = sessionsQuery;
 
   useEffect(() => {
     if (!user) return;
@@ -42,7 +44,11 @@ export default function Account() {
 
   const revoke = useMutation({
     mutationFn: revokeSession,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sessions'] }),
+    onSuccess: () => {
+      setSessionMessage({ ok: true, text: 'Session revoked.' });
+      qc.invalidateQueries({ queryKey: ['sessions'] });
+    },
+    onError: (e) => setSessionMessage({ ok: false, text: messageFor(e) }),
   });
 
   return (
@@ -110,7 +116,19 @@ export default function Account() {
       <section className="section">
         <span className="eyebrow">Sessions</span>
         <h2 style={{ marginTop: 6 }}>Active sessions</h2>
-      {isLoading && <p className="muted" style={{ marginTop: 14 }}>Loading sessions…</p>}
+      {sessionMessage && (
+        <p role="status" className={`alert ${sessionMessage.ok ? 'ok' : 'danger'}`} style={{ marginTop: 14 }}>
+          {sessionMessage.text}
+        </p>
+      )}
+      {sessionsQuery.isLoading && <p className="muted" style={{ marginTop: 14 }}>Loading sessions…</p>}
+      {sessionsQuery.isError && (
+        <div style={{ marginTop: 14 }}>
+          <p role="alert" className="alert danger">{messageFor(sessionsQuery.error)}</p>
+          <button type="button" onClick={() => sessionsQuery.refetch()}>Retry loading sessions</button>
+        </div>
+      )}
+      {!sessionsQuery.isError && sessions?.length === 0 && <p className="muted">No active sessions.</p>}
       <ul className="data-list" style={{ marginTop: 16 }}>
         {(sessions ?? []).map((s) => (
           <li key={s.id} className="data-row">
@@ -120,7 +138,13 @@ export default function Account() {
                 {s.ip} · last used {s.last_used_at ? new Date(s.last_used_at).toLocaleString() : '—'}
               </span>
             </span>
-            <button className="danger" onClick={() => revoke.mutate(s.id)} disabled={revoke.isPending}>Revoke</button>
+            <button
+              className="danger"
+              onClick={() => { setSessionMessage(null); revoke.mutate(s.id); }}
+              disabled={revoke.isPending}
+            >
+              {revoke.isPending && revoke.variables === s.id ? 'Revoking…' : 'Revoke'}
+            </button>
           </li>
         ))}
       </ul>

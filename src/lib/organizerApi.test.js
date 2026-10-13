@@ -15,8 +15,19 @@ import {
 
 describe('organizerApi', () => {
   it('listAllEvents hits the admin route', async () => {
-    server.use(http.get('/api/v1/admin/events', () => HttpResponse.json({ success: true, data: [{ id: 'e1', title: 'X', status: 'draft' }] })));
-    expect((await listAllEvents())[0].id).toBe('e1');
+    let query;
+    server.use(http.get('/api/v1/admin/events', ({ request }) => {
+      query = new URL(request.url).searchParams;
+      return HttpResponse.json({ success: true, data: {
+        rows: [{ id: 'e1', title: 'X', status: 'draft' }], page: 2, pageSize: 10, total: 11, totalPages: 2, statusCounts: {},
+      } });
+    }));
+    const result = await listAllEvents({ page: 2, pageSize: 10, status: 'draft', search: 'X' });
+    expect(result.rows[0].id).toBe('e1');
+    expect(query.get('page')).toBe('2');
+    expect(query.get('pageSize')).toBe('10');
+    expect(query.get('status')).toBe('draft');
+    expect(query.get('search')).toBe('X');
   });
 
   it('updateEvent PATCHes the event', async () => {
@@ -66,13 +77,20 @@ describe('organizerApi', () => {
   it('reviews event refund requests', async () => {
     let reviewBody = null;
     server.use(
-      http.get('/api/v1/events/e1/refund-requests', () => HttpResponse.json({ success: true, data: [{ id: 'rr1', status: 'pending' }] })),
+      http.get('/api/v1/events/e1/refund-requests', ({ request }) => {
+        const query = new URL(request.url).searchParams;
+        expect(query.get('page')).toBe('1');
+        expect(query.get('status')).toBe('pending');
+        return HttpResponse.json({ success: true, data: {
+          rows: [{ id: 'rr1', status: 'pending' }], page: 1, pageSize: 20, total: 1, totalPages: 1,
+        } });
+      }),
       http.patch('/api/v1/refund-requests/rr1', async ({ request }) => {
         reviewBody = await request.json();
         return HttpResponse.json({ success: true, data: { id: 'rr1', status: 'approved' } });
       }),
     );
-    expect((await eventRefundRequests('e1'))[0].id).toBe('rr1');
+    expect((await eventRefundRequests('e1', { page: 1, pageSize: 20, status: 'pending' })).rows[0].id).toBe('rr1');
     expect((await reviewRefundRequest('rr1', { decision: 'approve' })).status).toBe('approved');
     expect(reviewBody).toEqual({ decision: 'approve' });
   });

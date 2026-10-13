@@ -101,3 +101,12 @@ export const apiPost = (path, body, opts = {}) =>
 export const apiPatch = (path, body) => http.patch(path, body);
 
 export const apiDelete = (path) => http.delete(path);
+
+export function withQuery(path, params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  });
+  const serialized = query.toString();
+  return serialized ? `${path}?${serialized}` : path;
+}

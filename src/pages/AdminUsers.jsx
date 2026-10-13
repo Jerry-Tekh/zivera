@@ -2,14 +2,25 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listUsers, updateUserRole } from '../lib/authApi';
 import { messageFor } from '../lib/errors';
+import Pagination from '../components/Pagination.jsx';
 
 const ROLES = ['super_admin', 'organizer', 'event_staff', 'registered_user'];
+const PAGE_SIZE = 20;
 
 export default function AdminUsers() {
   const qc = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [pendingRoles, setPendingRoles] = useState({});
   const [message, setMessage] = useState(null);
-  const { data: users, isLoading } = useQuery({ queryKey: ['admin-users'], queryFn: listUsers });
+  const usersQuery = useQuery({
+    queryKey: ['admin-users', page, search, roleFilter],
+    queryFn: () => listUsers({ page, pageSize: PAGE_SIZE, search, role: roleFilter }),
+  });
+  const { data: result } = usersQuery;
+  const users = result?.rows ?? [];
   const roleChange = useMutation({
     mutationFn: ({ id, role }) => updateUserRole(id, role),
     onSuccess: (_user, variables) => {
@@ -31,13 +42,39 @@ export default function AdminUsers() {
         <h1>Users</h1>
         <p>Review account roles and update access levels for the platform.</p>
       </header>
+      <form
+        className="row"
+        role="search"
+        onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(searchInput.trim()); }}
+      >
+        <label>Search users<input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} /></label>
+        <label>Role
+          <select value={roleFilter} onChange={(e) => { setPage(1); setRoleFilter(e.target.value); }}>
+            <option value="">All roles</option>
+            {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+          </select>
+        </label>
+        <button type="submit">Search</button>
+        {(search || roleFilter) && (
+          <button type="button" onClick={() => { setPage(1); setSearchInput(''); setSearch(''); setRoleFilter(''); }}>
+            Clear filters
+          </button>
+        )}
+      </form>
       {message && (
         <p role="status" className={`alert ${message.ok ? 'ok' : 'danger'}`}>
           {message.text}
         </p>
       )}
 
-      {isLoading ? <p className="muted">Loading users…</p> : (
+      {usersQuery.isLoading ? <p className="muted">Loading users…</p> : usersQuery.isError ? (
+        <div>
+          <p role="alert" className="alert danger">{messageFor(usersQuery.error)}</p>
+          <button type="button" onClick={() => usersQuery.refetch()}>Retry loading users</button>
+        </div>
+      ) : !users.length ? (
+        <p className="muted">{search || roleFilter ? 'No users match these filters.' : 'No users found.'}</p>
+      ) : (
         <section className="table-card card">
         <table>
           <thead>
@@ -72,7 +109,7 @@ export default function AdminUsers() {
                     roleChange.mutate({ id: u.id, role: nextRole });
                   }}
                 >
-                  Save
+                  {roleChange.isPending && roleChange.variables?.id === u.id ? 'Saving…' : 'Save'}
                 </button>
                 </td>
               </tr>
@@ -81,6 +118,15 @@ export default function AdminUsers() {
           </tbody>
         </table>
         </section>
+      )}
+      {!usersQuery.isLoading && !usersQuery.isError && result && (
+        <Pagination
+          page={result.page}
+          pageSize={result.pageSize}
+          total={result.total}
+          totalPages={result.totalPages}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );

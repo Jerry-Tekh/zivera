@@ -12,7 +12,8 @@ export default function MyTickets() {
   const qc = useQueryClient();
   const [reasonByOrder, setReasonByOrder] = useState({});
   const [err, setErr] = useState(null);
-  const { data, isLoading, error } = useQuery({ queryKey: ['my-orders'], queryFn: () => apiGet('/orders') });
+  const ordersQuery = useQuery({ queryKey: ['my-orders'], queryFn: () => apiGet('/orders') });
+  const { data } = ordersQuery;
   const refundRequests = useQuery({ queryKey: ['my-refund-requests'], queryFn: listMyRefundRequests });
   const refundByOrder = useMemo(() => {
     const map = new Map();
@@ -26,13 +27,21 @@ export default function MyTickets() {
     onSuccess: () => {
       setErr(null);
       setReasonByOrder({});
+      qc.invalidateQueries({ queryKey: ['my-orders'] });
       qc.invalidateQueries({ queryKey: ['my-refund-requests'] });
     },
     onError: (e) => setErr(messageFor(e)),
   });
 
-  if (isLoading) return <p className="muted">Loading your tickets…</p>;
-  if (error) return <p className="muted">Could not load your tickets.</p>;
+  if (ordersQuery.isLoading) return <p className="muted">Loading your tickets…</p>;
+  if (ordersQuery.isError) {
+    return (
+      <div className="page">
+        <p role="alert" className="alert danger">{messageFor(ordersQuery.error)}</p>
+        <button type="button" onClick={() => ordersQuery.refetch()}>Retry loading tickets</button>
+      </div>
+    );
+  }
   if (!data.length) {
     return (
       <div className="panel reveal" style={{ padding: '54px 24px', textAlign: 'center' }}>
@@ -51,15 +60,22 @@ export default function MyTickets() {
         <p>Every paid order is kept here with QR tickets and refund request status.</p>
       </header>
       {err && <p className="alert danger">{err}</p>}
+      {refundRequests.isLoading && <p className="muted">Loading refund request statuses…</p>}
+      {refundRequests.isError && (
+        <div>
+          <p role="alert" className="alert danger">{messageFor(refundRequests.error)}</p>
+          <button type="button" onClick={() => refundRequests.refetch()}>Retry refund statuses</button>
+        </div>
+      )}
 
       {data.map((o, i) => (
         <section key={o.id} className="ticket-card card reveal" style={{ animationDelay: `${i * 70}ms` }}>
           <div>
-          <div className="ticket-media" style={{ backgroundImage: `linear-gradient(90deg, rgba(15,23,42,.72), rgba(15,23,42,.24)), url(${heroFor(o.event_id)})` }}>
+          <div className="ticket-media" style={{ backgroundImage: `linear-gradient(90deg, rgba(46,27,64,.78), rgba(66,39,87,.3)), url(${heroFor(o.event_id)})` }}>
             <div style={{ padding: 22, color: '#fff' }}>
               <span className={`badge${o.status === 'paid' ? ' ok' : o.status === 'refunded' ? ' warn' : ''}`}>{o.status}</span>
               <h2 style={{ color: '#fff', marginTop: 14 }}>{o.event_title}</h2>
-              <p className="mono" style={{ marginTop: 8, color: '#e0e7ff', fontSize: '0.78rem' }}>
+              <p className="mono" style={{ marginTop: 8, color: 'rgba(255, 255, 255, 0.84)', fontSize: '0.78rem' }}>
                 {o.category_name} · {o.quantity} ticket{o.quantity === 1 ? '' : 's'} · {money(o.amount_cents)}
                 {o.event_starts_at ? ` · ${new Date(o.event_starts_at).toLocaleDateString()}` : ''}
               </p>
@@ -76,6 +92,10 @@ export default function MyTickets() {
               <p className="mono muted" style={{ fontSize: '0.78rem' }}>
                 Refund request: <span className="badge">{refundByOrder.get(o.id).status}</span>
               </p>
+            ) : refundRequests.isLoading ? (
+              <p className="muted">Checking refund status…</p>
+            ) : refundRequests.isError ? (
+              <p className="muted">Refund requests are unavailable; retry before submitting a request.</p>
             ) : o.status === 'paid' ? (
               <form onSubmit={(e) => {
                 e.preventDefault();
@@ -89,8 +109,11 @@ export default function MyTickets() {
                     required
                   />
                 </label>
-                <button type="submit" disabled={request.isPending || !(reasonByOrder[o.id] ?? '').trim()}>
-                  {request.isPending ? 'Requesting…' : 'Request refund'}
+                <button
+                  type="submit"
+                  disabled={request.isPending || !(reasonByOrder[o.id] ?? '').trim()}
+                >
+                  {request.isPending && request.variables?.orderId === o.id ? 'Requesting…' : 'Request refund'}
                 </button>
               </form>
             ) : null}
