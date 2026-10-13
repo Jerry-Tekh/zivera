@@ -790,11 +790,22 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
 .ticket-card {
   overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   gap: 0;
 }
 .ticket-media { min-height: 170px; background-size: cover; background-position: center; }
 .qr-box { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; display: inline-grid; place-items: center; }
+.wallet-group { display: grid; gap: 14px; margin-top: 30px; }
+.wallet-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.wallet-group-heading h2 { margin: 0; }
+.wallet-group-empty { margin: 0; padding: 18px 0; }
+.wallet-ticket-list { display: flex; flex-wrap: wrap; gap: 12px; padding: 18px; }
+.wallet-ticket { display: grid; justify-items: start; gap: 8px; }
+.wallet-order-details { display: grid; align-content: start; gap: 14px; padding: 18px; border-left: 1px solid var(--border); }
+.wallet-order-details h4 { margin: 0; }
+.wallet-refund-history { display: grid; gap: 12px; margin: 0; padding-left: 20px; }
+.wallet-refund-history p { margin: 5px 0 0; overflow-wrap: anywhere; }
+.wallet-refund-pending { margin: 0; color: var(--muted); }
 
 .scanner-shell {
   max-width: 720px;
@@ -1210,7 +1221,8 @@ input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible
   .register-page { grid-template-columns: 1fr; min-height: 0; padding: 20px; }
   .register-visual { min-height: 360px; }
   .data-row { grid-template-columns: 1fr; }
-  .ticket-card { grid-template-columns: 1fr; }
+  .ticket-card { grid-template-columns: minmax(0, 1fr); }
+  .wallet-order-details { border-top: 1px solid var(--border); border-left: 0; }
   .hero-content { inset: auto 18px 20px 18px; }
   .hero-media { min-height: 420px; }
 }
