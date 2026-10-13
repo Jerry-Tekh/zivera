@@ -1,10 +1,37 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listAllEvents, createEvent } from '../lib/organizerApi';
+import { createEvent } from '../lib/organizerApi';
+import { eventPerformance } from '../lib/analyticsApi';
 import { messageFor } from '../lib/errors';
 import { EVENT_STATUSES, fromDateTimeLocal, optionalText } from '../lib/eventForms';
 import Pagination from '../components/Pagination.jsx';
+import './OrganizerDashboardPerformance.css';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+function utcDateValue(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function defaultPeriod() {
+  const today = new Date();
+  const to = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  return { from: utcDateValue(new Date(to.getTime() - 29 * DAY_MS)), to: utcDateValue(to) };
+}
+
+function exclusiveEnd(date) {
+  return new Date(new Date(`${date}T00:00:00.000Z`).getTime() + DAY_MS).toISOString();
+}
+
+function eventStartLabel(startsAt) {
+  if (!startsAt) return 'Date not set';
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(startsAt));
+}
 
 export default function OrganizerDashboard() {
   const qc = useQueryClient();
@@ -18,11 +45,21 @@ export default function OrganizerDashboard() {
   const [startsAt, setStartsAt] = useState('');
   const [status, setStatus] = useState('draft');
   const [err, setErr] = useState(null);
+  const [period, setPeriod] = useState(defaultPeriod);
+  const [periodDraft, setPeriodDraft] = useState(defaultPeriod);
+  const [periodError, setPeriodError] = useState('');
 
   const pageSize = 20;
   const eventsQuery = useQuery({
-    queryKey: ['admin-events', page, search, filterStatus],
-    queryFn: () => listAllEvents({ page, pageSize, search, status: filterStatus }),
+    queryKey: ['organizer-performance', page, search, filterStatus, period.from, period.to],
+    queryFn: () => eventPerformance({
+      page,
+      pageSize,
+      search,
+      status: filterStatus,
+      from: new Date(`${period.from}T00:00:00.000Z`).toISOString(),
+      to: exclusiveEnd(period.to),
+    }),
   });
   const { data: result, isLoading, isError, error } = eventsQuery;
   const events = result?.rows ?? [];
@@ -41,10 +78,23 @@ export default function OrganizerDashboard() {
       setStartsAt('');
       setStatus('draft');
       setPage(1);
-      qc.invalidateQueries({ queryKey: ['admin-events'] });
+      qc.invalidateQueries({ queryKey: ['organizer-performance'] });
     },
     onError: (e) => setErr(messageFor(e)),
   });
+  function applyPeriod(e) {
+    e.preventDefault();
+    const fromDate = new Date(`${periodDraft.from}T00:00:00.000Z`);
+    const toDate = new Date(`${periodDraft.to}T00:00:00.000Z`);
+    const days = (toDate - fromDate) / DAY_MS + 1;
+    if (!periodDraft.from || !periodDraft.to || days < 1 || days > 366) {
+      setPeriodError('Choose a valid date range of no more than 366 days.');
+      return;
+    }
+    setPeriodError('');
+    setPage(1);
+    setPeriod(periodDraft);
+  }
 
   return (
     <div className="page reveal">
@@ -106,10 +156,27 @@ export default function OrganizerDashboard() {
       <section className="section" id="events">
       <div className="between">
         <div>
-          <span className="eyebrow">Inventory</span>
-          <h2 style={{ marginTop: 6 }}>All events</h2>
+          <span className="eyebrow">Performance</span>
+          <h2 style={{ marginTop: 6 }}>Event performance</h2>
+          <p className="muted">Sales and refunds use the selected UTC period; remaining capacity is current inventory.</p>
         </div>
       </div>
+      <form
+        className="organizer-performance-period"
+        onSubmit={applyPeriod}
+        aria-label="Performance reporting period"
+      >
+        <label>From
+          <input type="date" value={periodDraft.from} max={periodDraft.to || undefined}
+            onChange={(e) => setPeriodDraft((current) => ({ ...current, from: e.target.value }))} />
+        </label>
+        <label>To
+          <input type="date" value={periodDraft.to} min={periodDraft.from || undefined}
+            onChange={(e) => setPeriodDraft((current) => ({ ...current, to: e.target.value }))} />
+        </label>
+        <button type="submit">Apply dates</button>
+      </form>
+      {periodError && <p role="alert" className="alert danger">{periodError}</p>}
       <form
         className="row"
         role="search"
@@ -137,17 +204,43 @@ export default function OrganizerDashboard() {
       {isLoading ? <p className="muted">Loading events…</p> : isError ? null : !events?.length ? (
         <p className="muted" style={{ marginTop: 16 }}>{search || filterStatus ? 'No events match these filters.' : 'No events yet. Create an event to get started.'}</p>
       ) : (
-        <ul className="data-list" style={{ marginTop: 16 }}>
-          {(events ?? []).map((ev) => (
-            <li key={ev.id} className="data-row">
-              <span>
-                <strong>{ev.title}</strong>
-                <span className={`badge${ev.status === 'published' ? ' ok' : ''}`} style={{ marginLeft: 10 }}>{ev.status}</span>
-              </span>
-              <Link to={`/organizer/events/${ev.id}`} className="btn ghost">Manage</Link>
-            </li>
-          ))}
-        </ul>
+        <div className="table-card organizer-performance-table">
+          <table>
+            <caption className="sr-only">Event performance and sales for the selected reporting window</caption>
+            <thead>
+              <tr>
+                <th scope="col">Event</th>
+                <th scope="col">Status / date</th>
+                <th scope="col">Tickets sold</th>
+                <th scope="col">Capacity remaining</th>
+                <th scope="col">Gross sales</th>
+                <th scope="col">Refunds</th>
+                <th scope="col">Net revenue</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map((event) => (
+                <tr key={event.id}>
+                  <th scope="row">
+                    <strong>{event.title}</strong>
+                    <span className="mono muted" style={{ display: 'block', fontSize: '0.72rem' }}>{event.id}</span>
+                  </th>
+                  <td>
+                    <span className={`badge${event.status === 'published' ? ' ok' : ''}`}>{event.status}</span>
+                    <span className="organizer-performance-date">{eventStartLabel(event.startsAt)}</span>
+                  </td>
+                  <td>{event.ticketsSold}</td>
+                  <td>{event.capacityRemaining} / {event.capacity}</td>
+                  <td>{money.format(event.grossRevenueCents / 100)}</td>
+                  <td>{money.format(event.refundedAmountCents / 100)}</td>
+                  <td><strong>{money.format(event.netRevenueCents / 100)}</strong></td>
+                  <td><Link to={`/organizer/events/${event.id}`} className="btn ghost">Manage</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {!isLoading && !isError && result && (
         <Pagination

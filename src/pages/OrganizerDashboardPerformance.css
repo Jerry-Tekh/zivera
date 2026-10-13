@@ -1,0 +1,18 @@
+.organizer-performance-period {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.organizer-performance-period label { min-width: 145px; }
+.organizer-performance-period button { min-height: 42px; }
+.organizer-performance-table { margin-top: 16px; }
+.organizer-performance-table table { min-width: 980px; }
+.organizer-performance-table th[scope="row"] { min-width: 180px; }
+.organizer-performance-date { display: block; margin-top: 6px; color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+
+@media (max-width: 620px) {
+  .organizer-performance-period label { flex: 1 1 135px; }
+  .organizer-performance-period button { width: 100%; justify-content: center; }
+}
