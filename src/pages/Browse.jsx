@@ -5,7 +5,6 @@ import { apiGet } from '../lib/api';
 import { heroFor } from '../lib/images';
 
 const PAGE = 8;
-const POPULAR_SEARCHES = ['Fintech', 'SummerFest', 'AIArena'];
 const VENUES = [
   { name: 'The Silicon Hub', events: 12, image: '/images/events/m-accelerator-yTsy3PYFPtc-unsplash.jpg' },
   { name: 'Civic Hall', events: 9, image: '/images/events/antenna-ohNCIiKVT1g-unsplash.jpg' },
@@ -101,31 +100,34 @@ export default function Browse() {
     <div className="page browse-page">
       <header className="browse-hero reveal">
         <div className="browse-hero-inner">
-          <span className="eyebrow">Premium event access</span>
-          <h1>Access the Unforgettable.</h1>
-          <p>
-            Premium tickets to the world's most exclusive events, tech summits, and live experiences.
-          </p>
-          <form className="browse-search" role="search" onSubmit={(e) => e.preventDefault()}>
-            <input
-              aria-label="Search events"
-              placeholder="Search events, venues, or categories"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            {q && (
-              <button type="button" className="ghost" onClick={() => setQ('')}>
-                Clear
-              </button>
-            )}
-          </form>
-          <div className="popular-searches" aria-label="Popular searches">
-            <span>Popular Searches</span>
-            {POPULAR_SEARCHES.map((item) => (
-              <button type="button" key={item} onClick={() => setQ(item)}>
-                #{item}
-              </button>
-            ))}
+          <div className="hero-copy">
+            <span className="eyebrow">Live events, all in one place</span>
+            <h1>Find something worth going to.</h1>
+            <p>
+              Browse concerts, festivals, and events. Book your tickets in a few simple steps.
+            </p>
+            <form className="browse-search" role="search" onSubmit={(e) => e.preventDefault()}>
+              <label htmlFor="event-search">Search events</label>
+              <div className={`hero-search-row${q ? ' has-clear' : ''}`}>
+                <input
+                  id="event-search"
+                  aria-label="Search events"
+                  placeholder="Event name or venue"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+                {q && (
+                  <button type="button" className="ghost" onClick={() => setQ('')}>
+                    Clear
+                  </button>
+                )}
+                <button type="submit" className="primary">Search</button>
+              </div>
+            </form>
+            <p className="hero-search-hint">Search by event name or venue.</p>
+          </div>
+          <div className="hero-visual">
+            <img src="/images/events/nicholas-green-nPz8akkUmDI-unsplash.jpg" alt="Audience at a live event" />
           </div>
         </div>
       </header>
@@ -133,10 +135,10 @@ export default function Browse() {
       <section className="browse-section reveal" aria-labelledby="featured-heading">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">Featured highlights</span>
-            <h2 id="featured-heading">Must-see events</h2>
+            <span className="eyebrow">Coming up</span>
+            <h2 id="featured-heading">Upcoming events</h2>
           </div>
-          <span className="muted">Limited availability across curated drops.</span>
+          <span className="muted">A selection of events happening soon.</span>
         </div>
 
         {error ? (
@@ -159,7 +161,7 @@ export default function Browse() {
                 <img src={heroFor(ev.id)} alt="" />
                 <div className="featured-overlay" />
                 <div className="featured-content">
-                  <span className="badge highlight">Limited Availability</span>
+                  <span className="badge highlight">Upcoming</span>
                   <div>
                     <h3>{ev.title}</h3>
                     <p>{fmtFullDate(ev.starts_at)}{ev.location ? ` · ${ev.location}` : ''}</p>

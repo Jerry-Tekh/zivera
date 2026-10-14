@@ -18,7 +18,7 @@ export default function Login() {
     setBusy(true);
     try {
       await login({ email, password });
-      navigate('/');
+      navigate('/dashboard');
     } catch (ex) {
       setErr(messageFor(ex));
     } finally {

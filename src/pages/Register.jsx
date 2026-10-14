@@ -18,7 +18,7 @@ export default function Register() {
     setBusy(true);
     try {
       await register({ name, email, password });
-      navigate('/');
+      navigate('/dashboard');
     } catch (ex) {
       setErr(messageFor(ex));
     } finally {
@@ -27,19 +27,30 @@ export default function Register() {
   }
 
   return (
-    <div className="auth-wrap reveal">
-      <section className="auth-card panel">
-        <span className="eyebrow">Join Zireva</span>
-        <h1 style={{ fontSize: '2.2rem', marginTop: 10 }}>Create account</h1>
+    <div className="auth-wrap register-page reveal">
+      <aside className="register-visual">
+        <img src="/images/events/filip-rankovic-grobgaard-TVpMTnvJxlI-unsplash.jpg" alt="" />
+        <div className="register-visual-shade" />
+        <div className="register-visual-copy">
+          <span className="register-visual-kicker">Zireva events</span>
+          <h2>Make a night of it.</h2>
+          <p>Find concerts, festivals, and events near you.</p>
+        </div>
+      </aside>
+      <section className="auth-card panel register-card">
+        <span className="eyebrow">Welcome to Zireva</span>
+        <h1>Create your account</h1>
+        <p className="register-intro">Create an account to book and manage your tickets.</p>
         {err && <p className="alert danger" style={{ marginTop: 16 }}>{err}</p>}
-        <form onSubmit={onSubmit} className="stack" style={{ marginTop: 22 }}>
-          <label>Name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>
-          <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
-          <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={10} /></label>
+        <form onSubmit={onSubmit} className="stack register-form">
+          <label>Name<input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required /></label>
+          <label>Email<input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+          <label>Password<input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={10} /></label>
+          <span className="register-password-hint">Use at least 10 characters for a stronger password.</span>
           <button className="primary" disabled={busy} type="submit">{busy ? 'Creating…' : 'Create account'}</button>
         </form>
-        <p className="muted" style={{ marginTop: 22, fontSize: '0.9rem' }}>
-          Have an account? <Link to="/login" style={{ color: 'var(--accent)', fontWeight: 800 }}>Log in</Link>
+        <p className="muted register-login">
+          Have an account? <Link to="/login">Log in</Link>
         </p>
       </section>
     </div>

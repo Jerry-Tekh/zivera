@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { listScannableEvents, scanTicket } from '../lib/scanApi';
 import { messageFor } from '../lib/errors';
 import CameraScanner from '../components/CameraScanner.jsx';
+import StaffScanAnalytics from '../components/StaffScanAnalytics.jsx';
 
 export default function Scanner() {
   const [eventId, setEventId] = useState('');
@@ -101,6 +102,7 @@ export default function Scanner() {
         {camera ? 'Stop camera' : 'Use camera'}
       </button>
       {camera && <div className="camera-frame"><CameraScanner onDecode={onDecode} onError={onCamError} /></div>}
+      <StaffScanAnalytics />
     </div>
   );
 }

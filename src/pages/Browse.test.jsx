@@ -26,7 +26,7 @@ describe('Browse', () => {
     renderPage();
     const results = await screen.findByRole('region', { name: /explore all events/i });
     expect(await within(results).findByText('Midnight Symphony')).toBeInTheDocument();
-    expect(await screen.findByText('Limited Availability')).toBeInTheDocument();
+    expect(await screen.findByText('Upcoming')).toBeInTheDocument();
   });
 
   it('shows clear empty states when no published events are returned', async () => {

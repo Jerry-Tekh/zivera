@@ -128,3 +128,63 @@ export function EventPerformancePlot({ events }) {
     </ResponsiveContainer>
   );
 }
+
+const SCAN_RESULT_LABELS = {
+  accepted: 'Admitted',
+  already_used: 'Already used',
+  wrong_event: 'Wrong event',
+  not_found: 'Not found',
+  invalid_signature: 'Invalid QR',
+  revoked: 'Revoked',
+};
+
+const SCAN_RESULT_COLORS = {
+  accepted: '#10b981',
+  already_used: '#d97706',
+  wrong_event: '#c352ed',
+  not_found: '#64748b',
+  invalid_signature: '#dc2626',
+  revoked: '#764ba2',
+};
+
+export function StaffScanTrendChart({ daily }) {
+  return (
+    <ResponsiveContainer width="100%" height={280}>
+      <BarChart data={daily} accessibilityLayer margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
+        <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" vertical={false} />
+        <XAxis
+          dataKey="day"
+          tickFormatter={dateLabel}
+          minTickGap={16}
+          tick={{ fill: 'var(--muted)', fontSize: 11 }}
+          axisLine={{ stroke: 'var(--border)' }}
+          tickLine={false}
+        />
+        <YAxis
+          allowDecimals={false}
+          tickFormatter={number}
+          tick={{ fill: 'var(--muted)', fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          width={48}
+        />
+        <Tooltip
+          labelFormatter={dateLabel}
+          formatter={(value, name) => [number(value), SCAN_RESULT_LABELS[name] ?? name]}
+          contentStyle={{ borderRadius: 10, borderColor: 'var(--border)' }}
+        />
+        <Legend formatter={(value) => SCAN_RESULT_LABELS[value] ?? value} />
+        {Object.entries(SCAN_RESULT_LABELS).map(([result, label]) => (
+          <Bar
+            key={result}
+            dataKey={`byResult.${result}`}
+            name={label}
+            stackId="scans"
+            fill={SCAN_RESULT_COLORS[result]}
+            maxBarSize={24}
+          />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}

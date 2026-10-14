@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
+import SystemHealth from './SystemHealth.jsx';
 
 const ROLE_NAMES = {
   registered_user: 'Attendee',
@@ -168,6 +169,7 @@ export default function DashboardLayout() {
           <div className="dashboard-topbar-context">
             <span>{roleName} workspace</span>
           </div>
+          <SystemHealth />
           <span className="dashboard-topbar-user">{user?.email}</span>
         </header>
         <main className="dashboard-content">

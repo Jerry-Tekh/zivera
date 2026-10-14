@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { server } from '../test/server';
 
 const mocks = vi.hoisted(() => ({ useAuth: vi.fn() }));
 vi.mock('../lib/auth.jsx', () => ({ useAuth: mocks.useAuth }));
@@ -13,26 +16,35 @@ function renderDashboard(role, initialPath = '/tickets') {
   function CurrentPath() {
     return <p data-testid="current-path">{useLocation().pathname}</p>;
   }
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <Routes>
-        <Route element={<DashboardLayout />}>
-          <Route path="*" element={<><p>Dashboard content</p><CurrentPath /></>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <Routes>
+          <Route element={<DashboardLayout />}>
+            <Route path="*" element={<><p>Dashboard content</p><CurrentPath /></>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 describe('DashboardLayout', () => {
-  beforeEach(() => mocks.useAuth.mockReset());
+  beforeEach(() => {
+    mocks.useAuth.mockReset();
+    server.use(http.get('/api/v1/health', () => HttpResponse.json({
+      success: true, data: { status: 'ok', db: true, redis: true },
+    })));
+  });
 
-  it('shows only the attendee workspace links for registered users', () => {
+  it('shows only the attendee workspace links for registered users', async () => {
     renderDashboard('registered_user');
     expect(screen.getByRole('link', { name: /my tickets/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /account/i })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /ticket scanner/i })).not.toBeInTheDocument();
     expect(screen.getByText('Dashboard content')).toBeInTheDocument();
+    expect(await screen.findByText('System online')).toBeInTheDocument();
   });
 
   it('shows organizer tools and allows collapsing the sidebar', async () => {

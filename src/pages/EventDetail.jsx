@@ -24,7 +24,7 @@ export default function EventDetail() {
         <div className="hero-content">
           <span className="badge ok" style={{ marginBottom: 14 }}>Live event</span>
           <h1>{data.title}</h1>
-          <span className="mono" style={{ display: 'block', marginTop: 12, color: '#e0e7ff', fontSize: '0.92rem' }}>
+          <span className="mono" style={{ display: 'block', marginTop: 12, color: 'rgba(255, 255, 255, 0.84)', fontSize: '0.92rem' }}>
             {fmtDate(data.starts_at)}{data.location ? ` · ${data.location}` : ''}
           </span>
         </div>

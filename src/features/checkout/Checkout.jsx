@@ -91,7 +91,7 @@ export default function Checkout({ category, onClose }) {
   return (
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(15, 23, 42, 0.52)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(46, 27, 64, 0.52)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
     >
       <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={`Checkout — ${category.name}`} className="panel reveal" style={{ width: 'min(480px, 100%)', padding: 28, outline: 'none' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>

@@ -1,3 +1,3 @@
-import { apiGet } from './api';
+import { http } from './api';
 
-export const getHealth = () => apiGet('/health');
+export const getHealth = () => http.get('/health', { validateStatus: () => true });

@@ -29,6 +29,32 @@ function mockEvents() {
   server.use(http.get('/api/v1/staff/events', () => HttpResponse.json({ success: true, data: [{ id: 'e1', title: 'Gate Night', location: 'Hall' }] })));
 }
 
+function mockScanAnalytics() {
+  server.use(http.get('/api/v1/staff/analytics/scans', () => HttpResponse.json({
+    success: true,
+    data: {
+      period: { timeZone: 'UTC', endExclusive: true, interval: 'day' },
+      metrics: { totalScans: 1, accepted: 1, rejected: 0 },
+      byResult: [
+        { result: 'accepted', count: 1 },
+        { result: 'already_used', count: 0 },
+        { result: 'wrong_event', count: 0 },
+        { result: 'not_found', count: 0 },
+        { result: 'invalid_signature', count: 0 },
+        { result: 'revoked', count: 0 },
+      ],
+      daily: [{
+        day: '2026-07-01',
+        byResult: {
+          accepted: 1, already_used: 0, wrong_event: 0,
+          not_found: 0, invalid_signature: 0, revoked: 0,
+        },
+        total: 1,
+      }],
+    },
+  })));
+}
+
 async function fillAndScan(token) {
   const tokenInput = screen.getByLabelText(/ticket code/i);
   await userEvent.clear(tokenInput);
@@ -39,6 +65,7 @@ async function fillAndScan(token) {
 describe('Scanner', () => {
   it('admits a valid ticket then rejects a duplicate', async () => {
     mockEvents();
+    mockScanAnalytics();
     server.use(
       http.post('/api/v1/events/e1/scan', () => HttpResponse.json({ success: true, data: { result: 'accepted', ticketId: 't1' } })),
     );
@@ -47,7 +74,7 @@ describe('Scanner', () => {
     await screen.findByRole('option', { name: /gate night/i });
     await userEvent.selectOptions(screen.getByLabelText(/^event$/i), 'e1');
     await fillAndScan('TKN');
-    expect(await screen.findByText(/admitted/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Admitted ✓/i)).toBeInTheDocument();
 
     server.use(
       http.post('/api/v1/events/e1/scan', () => HttpResponse.json(
@@ -59,15 +86,17 @@ describe('Scanner', () => {
 
   it('scans via the camera and admits', async () => {
     mockEvents();
+    mockScanAnalytics();
     server.use(http.post('/api/v1/events/e1/scan', () => HttpResponse.json({ success: true, data: { result: 'accepted' } })));
     renderScanner();
     await screen.findByRole('option', { name: /gate night/i });
     await userEvent.selectOptions(await screen.findByLabelText(/^event$/i), 'e1');
     await userEvent.click(screen.getByRole('button', { name: /use camera/i }));
-    expect(await screen.findByText(/admitted/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Admitted ✓/i)).toBeInTheDocument();
   });
 
   it('shows when no events are assigned to the staff user', async () => {
+    mockScanAnalytics();
     server.use(http.get('/api/v1/staff/events', () => HttpResponse.json({ success: true, data: [] })));
     renderScanner();
     expect(await screen.findByText(/no assigned events/i)).toBeInTheDocument();
@@ -76,6 +105,7 @@ describe('Scanner', () => {
   });
 
   it('shows an assigned-event load error and retries successfully', async () => {
+    mockScanAnalytics();
     let calls = 0;
     server.use(http.get('/api/v1/staff/events', () => {
       calls += 1;
@@ -93,6 +123,7 @@ describe('Scanner', () => {
   });
 
   it('uses the selected event, shows its context, and clears results when switching events', async () => {
+    mockScanAnalytics();
     server.use(
       http.get('/api/v1/staff/events', () => HttpResponse.json({
         success: true,
@@ -114,10 +145,10 @@ describe('Scanner', () => {
     expect(selectedContext).toHaveTextContent('Hall One');
     expect(selectedContext).toHaveTextContent(/2026/);
     await fillAndScan('TKN');
-    expect(await screen.findByText(/admitted/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Admitted ✓/i)).toBeInTheDocument();
 
     await userEvent.selectOptions(eventSelect, 'e2');
-    expect(screen.queryByText(/admitted/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Admitted ✓/i)).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: /selected event/i })).toHaveTextContent('Matinee');
     expect(screen.getByLabelText(/ticket code/i)).toHaveValue('');
   });
